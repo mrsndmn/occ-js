@@ -6,12 +6,13 @@ import {
   InterruptableStoppingCriteria,
 } from "@huggingface/transformers";
 
-// The converted ONNX model is served locally from `public/models/`.
-// See the README for how to generate it with the conversion script.
-// To load from the Hugging Face Hub instead, set `MODEL_ID` to a repo id
-// (e.g. "your-username/OCC-RAG-0.6B-ONNX") and remove the `allowRemoteModels` line.
-env.allowRemoteModels = false;
-const MODEL_ID = "OCC-RAG-0.6B-ONNX";
+// The converted ONNX model is loaded from the Hugging Face Hub at runtime
+// (the q4f16 weights are downloaded and cached in the browser). To serve the
+// model locally instead, drop the converted folder into `public/models/`,
+// set `MODEL_ID = "OCC-RAG-0.6B-ONNX"`, and use `env.allowRemoteModels = false`.
+// See the README and `scripts/convert.sh` for how the ONNX checkpoint is built.
+env.allowRemoteModels = true;
+const MODEL_ID = "mrsndmn/OCC-RAG-0.6B-ONNX";
 
 /**
  * Helper function to perform feature detection for WebGPU
