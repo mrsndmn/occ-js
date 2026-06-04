@@ -65,12 +65,6 @@ if "dtype" in c and "torch_dtype" not in c:
     c["torch_dtype"] = c.pop("dtype")
 c.pop("layer_types", None)
 c["transformers_version"] = "4.51.3"
-# Transformers.js needs the KV-cache dtype to match the fp16-weight variants;
-# without this it defaults past_key_values to float32 and the q4f16/fp16 models
-# abort on WebGPU ("uncaught exception: <number>").
-c["transformers.js_config"] = {
-    "kv_cache_dtype": {"q4f16": "float16", "fp16": "float16"}
-}
 json.dump(c, open(cp, "w"), indent=2)
 
 # tokenizer_config.json: drop the v5 list-form `extra_special_tokens`
