@@ -45,12 +45,6 @@ class TextGenerationPipeline {
     this.model ??= AutoModelForCausalLM.from_pretrained(this.model_id, {
       dtype: "q4f16",
       device: "webgpu",
-      // The exported q4f16 graph keeps float32 I/O with inserted precision
-      // casts; ONNX Runtime's default ("all") layout pass mis-fuses these and
-      // aborts session init in the browser ("uncaught exception: <number>",
-      // SimplifiedLayerNormFusion). "extended" optimizations load and run the
-      // model correctly — the skipped passes are CPU-layout-only.
-      session_options: { graphOptimizationLevel: "extended" },
       progress_callback,
     });
 
