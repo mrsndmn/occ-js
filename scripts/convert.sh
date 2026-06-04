@@ -26,8 +26,10 @@ PY="${WORK}/.venv/bin/python"
 uv pip install --python "${PY}" \
   "transformers==4.51.3" \
   "optimum>=2.1.0" "optimum-onnx[onnxruntime]>=0.1.0" \
-  "onnx==1.17.0" "onnxruntime==1.20.1" "onnxslim>=0.1.48" \
+  "onnx==1.17.0" "onnxruntime>=1.22" "onnx_ir" "onnxslim>=0.1.48" \
   "numpy<2.3" tqdm sentencepiece protobuf "huggingface_hub[cli]"
+# NOTE: onnxruntime>=1.22 is required for the q4f16 rebuild in step 5b
+# (model_type="qwen3" in the transformers optimizer; onnx_ir for MatMulNBits).
 
 echo ">> [2/6] Fetching the Transformers.js conversion script (@ ${TJS_REF})"
 BASE="https://raw.githubusercontent.com/huggingface/transformers.js/${TJS_REF}/scripts"
@@ -65,6 +67,12 @@ if "dtype" in c and "torch_dtype" not in c:
     c["torch_dtype"] = c.pop("dtype")
 c.pop("layer_types", None)
 c["transformers_version"] = "4.51.3"
+# The rebuilt q4f16/fp16 graphs (step 5b) have float16 KV-cache I/O, so
+# Transformers.js must feed a float16 past_key_values. Without this it defaults
+# to float32 and inference fails on a dtype mismatch.
+c["transformers.js_config"] = {
+    "kv_cache_dtype": {"q4f16": "float16", "fp16": "float16"}
+}
 json.dump(c, open(cp, "w"), indent=2)
 
 # tokenizer_config.json: drop the v5 list-form `extra_special_tokens`
@@ -86,6 +94,13 @@ echo ">> [5/6] Exporting to ONNX (q4f16, fp16, q4, q8)"
     --output_parent_dir "${WORK}/out" )
 
 CONV="${WORK}/out/src"
+
+echo ">> [5b] Rebuilding q4f16 as a pre-fused fp16 graph (WebGPU-loadable)"
+# The stock q4f16 export aborts ORT Web's session init (SimplifiedLayerNormFusion
+# vs ORT's inserted precision casts). Rebuild it from the fp32 model with the
+# qwen3 transformer optimizer so RMSNorm is pre-fused. See fuse_q4f16.py.
+HERE_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"${PY}" "${HERE_SCRIPTS}/fuse_q4f16.py" "${CONV}/onnx/model.onnx" "${CONV}/onnx/model_q4f16.onnx"
 
 echo ">> [6/6] Inlining chat template, writing generation_config, and installing to public/models"
 "${PY}" - "$SRC" "$CONV" <<'PY'
