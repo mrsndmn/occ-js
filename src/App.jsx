@@ -44,7 +44,13 @@ function App() {
   const [tps, setTps] = useState(null);
   const [numTokens, setNumTokens] = useState(null);
 
+  // This is a single-turn demo: each context allows exactly one question.
+  // Once a question has been asked, the inputs lock until the user resets.
+  const hasAsked = messages.length > 0;
+
   function onEnter(message) {
+    // Guard against asking a follow-up in the same context.
+    if (hasAsked || isRunning) return;
     setMessages((prev) => [...prev, { role: "user", content: message }]);
     setTps(null);
     setIsRunning(true);
@@ -365,7 +371,7 @@ function App() {
             }
             rows={4}
             value={context}
-            disabled={status !== "ready"}
+            disabled={status !== "ready" || hasAsked}
             onChange={(e) => setContext(e.target.value)}
           />
         </details>
@@ -373,18 +379,27 @@ function App() {
           <textarea
             ref={textareaRef}
             className="scrollbar-thin w-[550px] px-3 py-4 rounded-lg bg-transparent border-none outline-hidden text-gray-800 disabled:text-gray-400 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-300 disabled:placeholder-gray-200 dark:disabled:placeholder-gray-500 resize-none disabled:cursor-not-allowed"
-            placeholder="Type your message..."
+            placeholder={
+              hasAsked
+                ? "One question per context — press Reset to ask another."
+                : "Type your message..."
+            }
             type="text"
             rows={1}
             value={input}
-            disabled={status !== "ready"}
+            disabled={status !== "ready" || hasAsked}
             title={
-              status === "ready" ? "Model is ready" : "Model not loaded yet"
+              status !== "ready"
+                ? "Model not loaded yet"
+                : hasAsked
+                  ? "One question per context — press Reset to ask another"
+                  : "Model is ready"
             }
             onKeyDown={(e) => {
               if (
                 input.length > 0 &&
                 !isRunning &&
+                !hasAsked &&
                 e.key === "Enter" &&
                 !e.shiftKey
               ) {
@@ -398,7 +413,7 @@ function App() {
             <div className="cursor-pointer" onClick={onInterrupt}>
               <StopIcon className="h-8 w-8 p-1 rounded-md text-gray-800 dark:text-gray-100 absolute right-3 bottom-3" />
             </div>
-          ) : input.length > 0 ? (
+          ) : input.length > 0 && !hasAsked ? (
             <div className="cursor-pointer" onClick={() => onEnter(input)}>
               <ArrowRightIcon
                 className={`h-8 w-8 p-1 bg-gray-800 dark:bg-gray-100 text-white dark:text-black rounded-md absolute right-3 bottom-3`}
