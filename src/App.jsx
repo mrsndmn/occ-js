@@ -7,10 +7,26 @@ import Progress from "./components/Progress";
 
 const IS_WEBGPU_AVAILABLE = !!navigator.gpu;
 const STICKY_SCROLL_THRESHOLD = 120;
+// Each example prefills both the Context sources box and the question, so the
+// model can answer (and cite) from grounded passages. The last one asks
+// something the sources do not cover, to showcase calibrated abstention.
 const EXAMPLES = [
-  "What does the OCC-RAG model abstain from answering?",
-  "Summarise the provided sources in two sentences.",
-  "Which source supports the main claim, and why?",
+  {
+    question: "Who designed the Eiffel Tower, and how tall is it?",
+    context:
+      "The Eiffel Tower is a wrought-iron lattice tower on the Champ de Mars in Paris, France. It was designed by the engineer Gustave Eiffel and built between 1887 and 1889 for the 1889 World's Fair.\n\nThe tower stands 330 metres (1,083 ft) tall and was the tallest man-made structure in the world until the Chrysler Building was completed in 1930.",
+  },
+  {
+    question:
+      "What does a plant take in, and what does it release during photosynthesis?",
+    context:
+      "Photosynthesis is the process by which green plants convert light energy into chemical energy. Using sunlight, they combine carbon dioxide from the air with water drawn up from the soil.\n\nThe process produces glucose, which the plant uses for energy, and releases oxygen into the atmosphere as a by-product.",
+  },
+  {
+    question: "Who is the company's CEO?",
+    context:
+      "Our store accepts returns within 30 days of purchase with a valid receipt. Refunds are issued to the original payment method within 5–7 business days.\n\nItems marked as final sale cannot be returned or exchanged.",
+  },
 ];
 
 // Split the free-form context box into individual numbered sources.
@@ -55,6 +71,14 @@ function App() {
     setTps(null);
     setIsRunning(true);
     setInput("");
+  }
+
+  // Prefill the context sources, then ask the example question. Both state
+  // updates are batched, so the generate effect sees the new context.
+  function onExample(example) {
+    if (hasAsked || isRunning) return;
+    setContext(example.context);
+    onEnter(example.question);
   }
 
   function onInterrupt() {
@@ -309,13 +333,19 @@ function App() {
           <Chat messages={messages} />
           {messages.length === 0 && (
             <div>
-              {EXAMPLES.map((msg, i) => (
+              {EXAMPLES.map((example, i) => (
                 <div
                   key={i}
                   className="m-1 border border-gray-300 dark:border-gray-600 rounded-md p-2 bg-gray-100 dark:bg-gray-700 cursor-pointer max-w-[500px]"
-                  onClick={() => onEnter(msg)}
+                  onClick={() => onExample(example)}
+                  title={example.context}
                 >
-                  {msg}
+                  <div>{example.question}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Prefills {parseDocuments(example.context).length} context
+                    source
+                    {parseDocuments(example.context).length === 1 ? "" : "s"}
+                  </div>
                 </div>
               ))}
             </div>
